@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define USER_FILE "users.txt"
+#define TEMP_FILE "temp.txt"
+
 struct User{
     int ID;
     char name[50];
@@ -10,8 +13,8 @@ struct User{
 void createUser(){
     struct User user;
 
-    FILE *f = fopen("users.txt", "a");
-    if(f == NULL){
+    FILE *file = fopen(USER_FILE, "a");
+    if(file == NULL){
         printf("Unable to open file\n");
         return;
     }
@@ -25,41 +28,41 @@ void createUser(){
     printf("Enter Age :");
     scanf("%d", &user.age);
 
-    fprintf(f, "%d %s %d\n", user.ID, user.name, user.age);
+    fprintf(file, "%d %s %d\n", user.ID, user.name, user.age);
 
-    fclose(f);
+    fclose(file);
     printf("User added successfully");
 }
 
 void readUsers(){
     struct User user;
-    FILE *f = fopen("users.txt", "r");
+    FILE *file = fopen(USER_FILE, "r");
 
-    if(f == NULL){
+    if(file == NULL){
         printf("No users Found.\n");
         return ;
     }
 
     printf("ID\tName\tAge\n");
 
-    while(fscanf(f, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
+    while(fscanf(file, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
         printf("%d\t%s\t%d\n", user.ID, user.name, user.age);
     }
-    fclose(f);
+    fclose(file);
 }
 
-void updateUser(int ID){
+void updateUserById(int ID){
     struct User user;
-    FILE *f = fopen("users.txt", "r");
-    FILE *temp = fopen("temp.txt", "w");
+    FILE *file = fopen(USER_FILE, "r");
+    FILE *temp = fopen(TEMP_FILE, "w");
 
-    if(f == NULL || temp == NULL){
+    if(file == NULL || temp == NULL){
         printf("Error opening file\n");
         return;
     }
 
     int found = 0;
-    while(fscanf(f, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
+    while(fscanf(file, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
         if(user.ID == ID){
             found = 1;
 
@@ -73,41 +76,54 @@ void updateUser(int ID){
         fprintf(temp, "%d %s %d\n", user.ID, user.name, user.age);
     }
 
-    fclose(f);
+    fclose(file);
     fclose(temp);
 
     if(found){
-        remove("users.txt");
-        rename("temp.txt", "users.txt");
+        remove(USER_FILE);
+        rename(TEMP_FILE, USER_FILE);
         printf("User updated successfully");
     } else {
-        remove("temp.txt");
+        remove(TEMP_FILE);
         printf("User ID not found\n");
     }
 }
 
-void deleteUser(int ID){
+void deleteUserById(int ID){
     struct User user;
-    FILE *f = fopen("users.txt", "r");
-    FILE *temp = fopen("temp.txt", "w");
+    FILE *file = fopen(USER_FILE, "r");
+    FILE *temp = fopen(TEMP_FILE, "w");
 
-    if(f == NULL || temp == NULL){
+    if(file == NULL || temp == NULL){
         printf("Error opening file\n");
         return;
     }
 
-    while(fscanf(f, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
-        if(user.ID != ID){
+    int found = 0;
+    while(fscanf(file, "%d %s %d", &user.ID, user.name, &user.age) != EOF){
+        if(user.ID != ID)
+        {
             fprintf(temp, "%d %s %d\n", user.ID, user.name, user.age);
+        } 
+        else 
+        {
+            found = 1;
         }
     }
 
-    fclose(f);
+    fclose(file);
     fclose(temp);
 
-    remove("users.txt");
-    rename("temp.txt", "users.txt");
-    printf("User deleted successfully");
+    remove(USER_FILE);
+    rename(TEMP_FILE, USER_FILE);
+
+    if(!found){
+        printf("User ID not found\n");
+    }
+    else
+    {
+        printf("User deleted successfully");
+    }
 }
 
 int main() {
@@ -133,15 +149,16 @@ int main() {
             case 3:
                 printf("Enter ID to update: ");
                 scanf("%d", &id);
-                updateUser(id);
+                updateUserById(id);
                 break;
             case 4:
                 printf("Enter ID to delete: ");
                 scanf("%d", &id);
-                deleteUser(id);
+                deleteUserById(id);
                 break;
             case 5:
-                exit(0);
+                printf("Exiting...\n");
+                return 0;
             default:
                 printf("Invalid choice\n");
         }
