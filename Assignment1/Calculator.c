@@ -8,17 +8,17 @@
 
 int error = 0;
 
-int isOperator(char c);
+int isOperator(char character);
 int parseNumber(const char *input, int *index, int length, int isNegative);
 void stackPush(int *stack, int *top, int value);
-int handleOperation(int *stack, int *top, char op, int num);
+int handleOperation(int *stack, int *top, char operator, int number);
 int calculateFinalResult(const int *stack, int top);
 int evaluateExpression(const char *input);
-void removeSpaces(char *str);
+void removeSpaces(char *expression);
 
 int main()
 {
-    char input[1000];
+    char input[100];
 
     fgets(input, sizeof(input), stdin);
     error = 0;
@@ -34,52 +34,52 @@ int main()
     return 0;
 }
 
-int isOperator(char c)
+int isOperator(char character)
 {
-    return c == '+' || c == '-' || c == '*' || c == '/';
+    return character == '+' || character == '-' || character == '*' || character == '/';
 }
 
-void removeSpaces(char *str)
+void removeSpaces(char *expression)
 {
     int readIndex = 0, writeIndex = 0;
-    while (str[readIndex])
+    while (expression[readIndex])
     {
-        if (!isspace((unsigned char)str[readIndex]))
+        if (!isspace((unsigned char)expression[readIndex]))
         {
-            str[writeIndex++] = str[readIndex];
+            expression[writeIndex++] = expression[readIndex];
         }
         readIndex++;
     }
-    str[writeIndex] = '\0';
+    expression[writeIndex] = '\0';
 }
 
-int parseNumber(const char *expr, int *pos, int len, int negative)
+int parseNumber(const char *expression, int *index, int length, int isNegative)
 {
-    long long num = 0;
+    long long number = 0;
 
-    while (*pos < len && isdigit((unsigned char)expr[*pos]))
+    while (*index < length && isdigit((unsigned char)expression[*index]))
     {
-        num = num * 10 + (expr[*pos] - '0');
+        number = number * 10 + (expression[*index] - '0');
 
-        if ((!negative && num > INT_MAX) || (negative && num > (long long)INT_MAX + 1))
+        if ((!isNegative && number > INT_MAX) || (isNegative && number > (long long)INT_MAX + 1))
         {
             printf("Error: Integer overflow detected.\n");
             error = 1;
             return 0;
         }
-        (*pos)++;
+        (*index)++;
     }
 
-    if (negative) num = -num;
+    if (isNegative) number = -number;
 
-    if (num < INT_MIN || num > INT_MAX)
+    if (number < INT_MIN || number > INT_MAX)
     {
         printf("Error: Number out of range.\n");
         error = 1;
         return 0;
     }
 
-    return (int)num;
+    return (int)number;
 }
 
 void stackPush(int *stack, int *top, int value)
@@ -93,36 +93,36 @@ void stackPush(int *stack, int *top, int value)
     stack[++(*top)] = value;
 }
 
-int handleOperation(int *stack, int *top, char op, int num)
+int handleOperation(int *stack, int *top, char operator, int number)
 {
-    if (op == '/')
+    if (operator == '/')
     {
-        if (num == 0)
+        if (number == 0)
         {
             printf("Error: Division by zero.\n");
             error = 1;
             return 0;
         }
-        stack[*top] /= num;
+        stack[*top] /= number;
     }
-    else if (op == '*')
+    else if (operator == '*')
     {
-        long long res = (long long)stack[*top] * num;
-        if (res > INT_MAX || res < INT_MIN)
+        long long result = (long long)stack[*top] * number;
+        if (result > INT_MAX || result < INT_MIN)
         {
             printf("Error: Multiplication overflow.\n");
             error = 1;
             return 0;
         }
-        stack[*top] = (int)res;
+        stack[*top] = (int)result;
     }
-    else if (op == '+')
+    else if (operator == '+')
     {
-        stackPush(stack, top, num);
+        stackPush(stack, top, number);
     }
-    else if (op == '-')
+    else if (operator == '-')
     {
-        stackPush(stack, top, -num);
+        stackPush(stack, top, -number);
     }
     return 1;
 }
@@ -143,44 +143,44 @@ int calculateFinalResult(const int *stack, int top)
     return (int)total;
 }
 
-int evaluateExpression(const char *expr)
+int evaluateExpression(const char *expression)
 {
     int stack[STACK_SIZE];
     int top = -1;
-    int len = strlen(expr);
+    int length = strlen(expression);
     int i = 0;
 
-    char currentOp = '+';
+    char currentOperator = '+';
     int expectNumber = 1;
     int negativeFlag = 0;
 
-    while (i < len)
+    while (i < length)
     {
-        char c = expr[i];
+        char character = expression[i];
 
-        if (isspace((unsigned char)c))
+        if (isspace((unsigned char)character))
         {
             i++;
             continue;
         }
 
-        if (isdigit((unsigned char)c))
+        if (isdigit((unsigned char)character))
         {
-            int value = parseNumber(expr, &i, len, negativeFlag);
+            int value = parseNumber(expression, &i, length, negativeFlag);
             negativeFlag = 0;
             if (error) return 0;
 
-            handleOperation(stack, &top, currentOp, value);
+            handleOperation(stack, &top, currentOperator, value);
             if (error) return 0;
 
             expectNumber = 0;
             continue;
         }
 
-        if (isOperator(c))
+        if (isOperator(character))
         {
             // Handle negative numbers at start or after another operator
-            if (expectNumber && c == '-')
+            if (expectNumber && character == '-')
             {
                 if (negativeFlag)
                 {
@@ -195,18 +195,18 @@ int evaluateExpression(const char *expr)
 
             if (expectNumber)
             {
-                printf("Error: Expression cannot start with '%c'.\n", c);
+                printf("Error: Expression cannot start with '%character'.\n", character);
                 error = 1;
                 return 0;
             }
 
-            currentOp = c;
+            currentOperator = character;
             expectNumber = 1;
             i++;
         }
         else
         {
-            printf("Error: Unexpected character '%c'.\n", c);
+            printf("Error: Unexpected character '%character'.\n", character);
             error = 1;
             return 0;
         }
