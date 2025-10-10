@@ -131,7 +131,7 @@ int main() {
 
             int parsed = sscanf(line, "%d %49s %d %d %d", &roll, name, &marks1, &marks2, &marks3);
             if (parsed != 5) {
-                printf("Incomplete details . Please type all details.\n");
+                printf("Invalid input format. Please type all details correctly.\n");
                 continue;
             }
 
