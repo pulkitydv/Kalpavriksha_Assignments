@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define MIN_MATRIX_SIZE 2
+#define MAX_MATRIX_SIZE 10
+#define PIXEL_MAX_VALUE 256
+
 void swapValues(int *firstValue, int *secondValue)
 {
     int temporary = *firstValue;
@@ -14,7 +18,7 @@ int getMatrixSize()
     int matrixSize, validInput;
     do
     {
-        printf("Enter matrix size (2-10): ");
+        printf("Enter matrix size (%d-%d): ", MIN_MATRIX_SIZE, MAX_MATRIX_SIZE);
         validInput = scanf("%d", &matrixSize);
         if (validInput != 1)
         {
@@ -22,11 +26,11 @@ int getMatrixSize()
             while (getchar() != '\n');
             continue;
         }
-        if (matrixSize < 2 || matrixSize > 10)
+        if (matrixSize < MIN_MATRIX_SIZE || matrixSize > MAX_MATRIX_SIZE)
         {
-            printf("Invalid size! Enter a value between 2 and 10.\n");
+            printf("Invalid size! Enter a value between %d and %d.\n", MIN_MATRIX_SIZE, MAX_MATRIX_SIZE);
         }
-    } while (validInput != 1 || matrixSize < 2 || matrixSize > 10);
+    } while (validInput != 1 || matrixSize < MIN_MATRIX_SIZE || matrixSize > MAX_MATRIX_SIZE);
 
     return matrixSize;
 }
@@ -87,12 +91,12 @@ void smoothenMatrix(int *matrix, int matrixSize)
                 {
                     if (rowNumber >= 0 && rowNumber < matrixSize && columnNumber >= 0 && columnNumber < matrixSize)
                     {
-                        sum += (*(matrix + rowNumber * matrixSize + columnNumber)) % 256;
+                        sum += (*(matrix + rowNumber * matrixSize + columnNumber)) % PIXEL_MAX_VALUE;
                         count++;
                     }
                 }
             }
-            *(matrix + row * matrixSize + column) += (sum / count) * 256;
+            *(matrix + row * matrixSize + column) += (sum / count) * PIXEL_MAX_VALUE;
         }
     }
 
@@ -100,7 +104,7 @@ void smoothenMatrix(int *matrix, int matrixSize)
     {
         for (int column = 0; column < matrixSize; column++)
         {
-            *(matrix + row * matrixSize + column) /= 256;
+            *(matrix + row * matrixSize + column) /= PIXEL_MAX_VALUE;
         }
     }
 }
@@ -116,11 +120,11 @@ int main()
     printMatrix(&matrix[0][0], matrixSize);
 
     rotateMatrix(&matrix[0][0], matrixSize);
-    printf("\nMatrix after 90° Clockwise Rotation:\n");
+    printf("\nMatrix after 90 degree Clockwise Rotation:\n");
     printMatrix(&matrix[0][0], matrixSize);
 
     smoothenMatrix(&matrix[0][0], matrixSize);
-    printf("\nMatrix after Applying 3×3 Smoothing Filter:\n");
+    printf("\nMatrix after Applying 3x3 Smoothing Filter:\n");
     printMatrix(&matrix[0][0], matrixSize);
 
     return 0;
