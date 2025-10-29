@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define MAX_INITIAL_PRODUCTS 100
 #define MAX_NAME_LENGTH 50
@@ -95,6 +96,10 @@ int getProductID(Product *products){
 
 char* getProductName(){
     char* productName = calloc(MAX_NAME_LENGTH, sizeof(char));
+    if(productName == NULL){
+        printf("Memory allocation failed!\n");
+        return NULL;
+    }
     fgets(productName, MAX_NAME_LENGTH, stdin);
     productName[strcspn(productName, "\n")] = '\0';
     return productName;
@@ -131,6 +136,9 @@ void getProductDetails(Product *products, int productNumber){
     (products+productNumber)->productID = getProductID(products);
     printf("Product Name: ");
     (products+productNumber)->productName = getProductName();
+    if((products+productNumber)->productName == NULL){
+        return;
+    }
     printf("Product Price: ");
     (products+productNumber)->productPrice = getProductPrice();
     printf("Product Quantity: ");
@@ -226,7 +234,7 @@ int isSubstring(char* substring, char* string){
         char* stringPtr = string;
         char* substringPtr = substring;
 
-        while(*stringPtr != '\0' && *substringPtr != '\0' && *stringPtr == *substringPtr){
+        while(*stringPtr != '\0' && *substringPtr != '\0' && tolower(*stringPtr) == tolower(*substringPtr)){
             stringPtr++;
             substringPtr++;
         }
@@ -380,6 +388,10 @@ int main(){
     initialProducts = getInitialNumberOfProducts();
 
     Product *products = calloc(initialProducts, sizeof(Product));
+    if(products == NULL){
+        printf("Memory allocation failed!");
+        return 1;
+    }
     for(int productNumber = 0; productNumber < initialProducts; productNumber++){
         printf("\nEnter details for product %d: \n", productNumber + 1);
         getProductDetails(products, productNumber);
