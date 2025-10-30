@@ -9,14 +9,17 @@
 #define MAX_PRODUCT_PRICE 100000.0
 #define MAX_PRODUCT_QUANTITY 1000000
 
-int currentNumberOfProducts = 0;
-
 typedef struct{
     int productID;
     char* productName;
     float productPrice;
     int productQuantity;
 } Product;
+
+typedef struct{
+    Product* products;
+    int currentNumberOfProducts;
+} Inventory;
 
 int getValidInteger(){
     int integer;
@@ -70,23 +73,23 @@ int getInitialNumberOfProducts(){
     }
 }
 
-int idExists(Product *products, int id){
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        if(id == (products+product)->productID){
+int idExists(Inventory *inventory, int id){
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        if(id == (inventory->products + product)->productID){
             return 1;
         }
     }
     return 0;
 }
 
-int getProductID(Product *products){
+int getProductID(Inventory *inventory){
     int productID;
 
     while(1){
         productID = getValidInteger();
         if(productID < 1 || productID > MAX_PRODUCT_ID){
             printf("Invalid ID. Enter ID between 1 - 10000: ");
-        } else if(idExists(products, productID)){
+        } else if(idExists(inventory, productID)){
             printf("ID Already Exists! Try again: ");
         } else {
             return productID;
@@ -131,18 +134,18 @@ int getProductQuantity(){
     }
 }
 
-void getProductDetails(Product *products, int productNumber){
+void getProductDetails(Inventory *inventory, int productNumber){
     printf("Product ID: ");
-    (products+productNumber)->productID = getProductID(products);
+    (inventory->products + productNumber)->productID = getProductID(inventory);
     printf("Product Name: ");
-    (products+productNumber)->productName = getProductName();
-    if((products+productNumber)->productName == NULL){
+    (inventory->products + productNumber)->productName = getProductName();
+    if((inventory->products + productNumber)->productName == NULL){
         return;
     }
     printf("Product Price: ");
-    (products+productNumber)->productPrice = getProductPrice();
+    (inventory->products + productNumber)->productPrice = getProductPrice();
     printf("Product Quantity: ");
-    (products+productNumber)->productQuantity = getProductQuantity();
+    (inventory->products + productNumber)->productQuantity = getProductQuantity();
 }
 
 void showMenu()
@@ -158,23 +161,23 @@ void showMenu()
     printf("8. Exit\n");
 }
 
-Product *addNewProduct(Product *products)
+Product *addNewProduct(Inventory *inventory)
 {
-    Product *tempPtr = realloc(products, (currentNumberOfProducts + 1) * sizeof(Product));
+    Product *tempPtr = realloc(inventory->products, (inventory->currentNumberOfProducts + 1) * sizeof(Product));
     if (tempPtr != NULL)
     {
-        products = tempPtr;
-        currentNumberOfProducts++;
+        inventory->products = tempPtr;
+        inventory->currentNumberOfProducts++;
     }
     else
     {
         printf("\nFailed to reallocate memory!\n");
-        return products;
+        return NULL;
     }
     printf("\nEnter new product details: \n");
-    getProductDetails(products, currentNumberOfProducts - 1);
+    getProductDetails(inventory, inventory->currentNumberOfProducts - 1);
     printf("Product added successfully!\n");
-    return products;
+    return inventory->products;
 }
 
 void productDetails(Product* product){
@@ -182,49 +185,49 @@ void productDetails(Product* product){
     product->productID, product->productName, product->productPrice, product->productQuantity);
 }
 
-void viewAllProducts(Product* products){
+void viewAllProducts(Inventory *inventory){
     printf("\n========= PRODUCT LIST =========\n");
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        productDetails(products + product);
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        productDetails(inventory->products + product);
     }
 }
 
-void updateQuantity(Product* products){
+void updateQuantity(Inventory *inventory){
     int newQuantity;
     int id;
     printf("\nEnter Product ID to update quantity: ");
     id = getValidInteger();
-    if(!idExists(products, id)){
+    if(!idExists(inventory, id)){
         printf("ID does not exist!\n");
         return; 
     }
     printf("Enter new Quantity: ");
     newQuantity = getProductQuantity();
 
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        if(id == (products+product)->productID){
-            (products + product)->productQuantity = newQuantity;
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        if(id == (inventory->products + product)->productID){
+            (inventory->products + product)->productQuantity = newQuantity;
         }
     }
     printf("Quantity updated successfully!\n");
 }
 
-void searchProductByID(Product* products){
+void searchProductByID(Inventory *inventory){
     int id;
     printf("\nEnter Product ID to search: ");
     id = getValidInteger();
-    if (!idExists(products, id))
+    if (!idExists(inventory, id))
     {
         printf("ID does not exist!\n");
         return;
     }
 
     printf("Product Found: ");
-    for (int product = 0; product < currentNumberOfProducts; product++)
+    for (int product = 0; product < inventory->currentNumberOfProducts; product++)
     {
-        if (id == (products + product)->productID)
+        if (id == (inventory->products + product)->productID)
         {
-            productDetails(products + product);
+            productDetails(inventory->products + product);
         }
     }
 }
@@ -246,18 +249,18 @@ int isSubstring(char* substring, char* string){
     return 0;
 }
 
-void searchProductByName(Product* products){
+void searchProductByName(Inventory *inventory){
     printf("\nEnter name to search (partial allowed): ");
     char* nameToFind = getProductName();
     int found = 0;
 
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        if(isSubstring(nameToFind, (products+product)->productName)){
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        if(isSubstring(nameToFind, (inventory->products+product)->productName)){
             if(!found){
                 printf("Products found: \n");
                 found = 1;
             }
-            productDetails(products + product);
+            productDetails(inventory->products + product);
         }
     }
     if(!found){
@@ -266,24 +269,29 @@ void searchProductByName(Product* products){
     free(nameToFind);
 }
 
-void searchProductByPriceRange(Product *products)
+void searchProductByPriceRange(Inventory *inventory)
 {
     float minPrice, maxPrice;
     printf("\nEnter the minimum price: ");
     minPrice = getValidFloat();
     printf("Enter the maximum price: ");
-    maxPrice = getValidFloat();
+    maxPrice = getValidFloat(); 
+    if(minPrice > maxPrice){
+        printf("Invalid range! Minimum price cannot be greater than maximum price.\n");
+        return;
+    }
+
     int isThereAnyProduct = 0;
 
-    for (int product = 0; product < currentNumberOfProducts; product++)
+    for (int product = 0; product < inventory->currentNumberOfProducts; product++)
     {
-        if ((products + product)->productPrice >= minPrice && (products + product)->productPrice <= maxPrice)
+        if ((inventory->products + product)->productPrice >= minPrice && (inventory->products + product)->productPrice <= maxPrice)
         {
             if(!isThereAnyProduct){
                 printf("\nProducts in price range: \n");
                 isThereAnyProduct = 1;
-            }   
-            productDetails(products + product);
+            }
+            productDetails(inventory->products + product);
         }
     }
     if (!isThereAnyProduct)
@@ -292,56 +300,52 @@ void searchProductByPriceRange(Product *products)
     }
 }
 
-void shiftProducts(Product* product, int index){
-    while(index + 1 < currentNumberOfProducts){
-        product->productID = (product+1)->productID;
-        product->productName = (product+1)->productName;
-        product->productPrice = (product+1)->productPrice;
-        product->productQuantity = (product+1)->productQuantity;
+void shiftProducts(Inventory *inventory, int index){
+    while(index + 1 < inventory->currentNumberOfProducts){
+        *(inventory->products+index) = *(inventory->products+index + 1);
         index++;
-        product++;
     }
 }
 
-Product* deleteProduct(Product* products){
+Product* deleteProduct(Inventory *inventory){
     printf("\nEnter Product ID to delete: ");
     int idToDelete = getValidInteger();
-    if (!idExists(products, idToDelete))
+    if (!idExists(inventory, idToDelete))
     {
         printf("ID does not exist!\n");
-        return products;
+        return inventory->products;
     }
 
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        if( (products+product)->productID == idToDelete){
-            free((products + product)->productName);
-            shiftProducts((products+product), product);
-            currentNumberOfProducts--;
-            Product *tempPtr = realloc(products, currentNumberOfProducts * sizeof(Product));
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        if( (inventory->products+product)->productID == idToDelete){
+            free((inventory->products + product)->productName);
+            shiftProducts(inventory, product);
+            inventory->currentNumberOfProducts--;
+            Product *tempPtr = realloc(inventory->products, inventory->currentNumberOfProducts * sizeof(Product));
             if (tempPtr != NULL)
             {
-                products = tempPtr;
+                inventory->products = tempPtr;
             }
             else
             {
                 printf("Item deleted. Failed to reallocate memory.\n");
-                return products;
+                return inventory->products;
             }
             printf("Product deleted successfully!\n");
         }
     }
-    return products;
+    return inventory->products;
 }
 
-void freeMemory(Product* products){
-    for(int product = 0; product < currentNumberOfProducts; product++){
-        free((products+product)->productName);
+void freeMemory(Inventory *inventory){
+    for(int product = 0; product < inventory->currentNumberOfProducts; product++){
+        free((inventory->products+product)->productName);
     }
-    free(products);
-    products = NULL;
+    free(inventory->products);
+    inventory->products = NULL;
 }
 
-void menuOperations(Product* products){
+void menuOperations(Inventory *inventory){
     int choice = 0;
 
     while(choice != 8){
@@ -351,28 +355,28 @@ void menuOperations(Product* products){
         switch (choice)
         {
         case 1:
-            products = addNewProduct(products);
+            inventory->products = addNewProduct(inventory);
             break;
         case 2:
-            viewAllProducts(products);
+            viewAllProducts(inventory);
             break;
         case 3:
-            updateQuantity(products);
+            updateQuantity(inventory);
             break;
         case 4:
-            searchProductByID(products);
+            searchProductByID(inventory);
             break;
         case 5:
-            searchProductByName(products);
+            searchProductByName(inventory);
             break;
         case 6:
-            searchProductByPriceRange(products);
+            searchProductByPriceRange(inventory);
             break;
         case 7:
-            products = deleteProduct(products);
+            inventory->products = deleteProduct(inventory);
             break;
         case 8:
-            freeMemory(products);
+            freeMemory(inventory);
             printf("Memory released successfully. Exiting program...");
             return;
         default:
@@ -383,21 +387,23 @@ void menuOperations(Product* products){
 
 int main(){
 
-    int initialProducts;
-    printf("Enter initial number of products: ");
-    initialProducts = getInitialNumberOfProducts();
+    Inventory inventory;  
+    inventory.currentNumberOfProducts = 0;
 
-    Product *products = calloc(initialProducts, sizeof(Product));
-    if(products == NULL){
+    printf("Enter initial number of products: ");
+    int initialProducts = getInitialNumberOfProducts();
+
+    inventory.products = calloc(initialProducts, sizeof(Product));
+    if(inventory.products == NULL){
         printf("Memory allocation failed!");
         return 1;
     }
     for(int productNumber = 0; productNumber < initialProducts; productNumber++){
         printf("\nEnter details for product %d: \n", productNumber + 1);
-        getProductDetails(products, productNumber);
-        currentNumberOfProducts++;
+        getProductDetails(&inventory, productNumber);
+        inventory.currentNumberOfProducts++;
     }
 
-    menuOperations(products);
+    menuOperations(&inventory);
     return 0;
 }
