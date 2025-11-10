@@ -36,6 +36,10 @@ void initializeFreeBlock(){
 
     for(int index = 0; index < MAX_NUM_BLOCKS; index++){
         FreeBlock* block = (FreeBlock*) malloc(sizeof(FreeBlock));
+        if(!block){
+            printf("Memory allocation failed during initialization.\n");
+            exit(1);
+        }
         block->index = index;
         block->next = NULL;
         block->prev = previous;
@@ -55,6 +59,10 @@ void initializeFileSystem() {
     initializeFreeBlock();
 
     root = (FileNode*) malloc(sizeof(FileNode));
+    if(!root){
+        printf("Memory allocation failed during initialization.\n");
+        exit(1);
+    }
     root->isDirectory = 1;
     root->parent = NULL;
     root->child = NULL;
@@ -86,6 +94,10 @@ void freeFileBlocks(FileNode* file){
         int blockIndex = file->blockPointers[index];
         if(blockIndex >= 0){
             FreeBlock* newFreeBlock = (FreeBlock*)malloc(sizeof(FreeBlock));
+            if(!newFreeBlock){
+                printf("Memory allocation failed.\n");
+                exit(1);
+            }
             newFreeBlock->index = blockIndex;
             newFreeBlock->next = freeListHead;
             if(freeListHead){
@@ -112,6 +124,10 @@ void mkdir(char* name){
         } while (node != cwd->child);
     }
     FileNode* newDirectory = (FileNode*) malloc(sizeof(FileNode));
+    if(!newDirectory){  
+        printf("Memory allocation failed.\n");
+        return;
+    }
     strcpy(newDirectory->name, name);
     newDirectory->isDirectory = 1;
     newDirectory->parent = cwd;
@@ -186,7 +202,7 @@ void cd(char* name){
     }
     else{
         if(cwd->child == NULL){
-            printf("%s is empty.\n", cwd->name);
+            printf("No folder found with the name %s\n", name);
             return;
         }
         FileNode* temp = cwd->child;
@@ -221,6 +237,11 @@ void create(char* name)
         } while (node != cwd->child);
     }
     FileNode *newFile = (FileNode *)malloc(sizeof(FileNode));
+    if (!newFile)
+    {
+        printf("Memory allocation failed.\n");
+        return;
+    }
     strcpy(newFile->name, name);
     newFile->isDirectory = 0;
     newFile->parent = cwd;
@@ -272,11 +293,11 @@ void writeData(FileNode* file, char* data){
         start += MAX_BLOCK_SIZE;
     }
     printf("Data written successfully(size = %d bytes)\n", file->contentSize);
-}
+} 
 
 void write(char* fileName, char* data){
     if(data[0] != '"' || data[strlen(data) - 1] != '"'){
-        printf("Syntax error.\n");
+        printf("Data should be enclosed in double quotes.\n");
         return;
     }
     data[strlen(data) - 1] = '\0';
@@ -427,7 +448,7 @@ void df(){
     printf("Disk usage: %.2f%%\n", (float)((MAX_NUM_BLOCKS - freeBlocks) * 100.0) / MAX_NUM_BLOCKS);
 }
 
-void freeFreeBlocks()
+void releaseFreeBlockList()
 {
     FreeBlock *temp = freeListHead;
     while (temp)
@@ -466,7 +487,7 @@ void exit_system()
     freeFileNodes(root);
     root = NULL;
     cwd = NULL;
-    freeFreeBlocks();
+    releaseFreeBlockList();
     printf("Memory released. Exiting program...\n");
 }
 
