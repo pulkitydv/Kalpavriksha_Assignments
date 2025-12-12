@@ -18,8 +18,7 @@ typedef enum
 typedef enum
 {
     EMPTY,
-    OCCUPIED,
-    DELETED
+    OCCUPIED
 } HashStatus;
 
 typedef struct
@@ -474,26 +473,102 @@ void calculateValues()
     }
 }
 
+void sortTerminatedQueueByPID()
+{
+    if (isQueueEmpty(terminatedQueue) || terminatedQueue->size <= 1)
+    {
+        return;
+    }
+
+    int *pidArray = (int*) malloc(terminatedQueue->size * sizeof(int));
+    if (!pidArray)
+    {
+        printf("Memory allocation failed.\n");
+        return;
+    }
+
+    QueueNode *current = terminatedQueue->front;
+    int count = 0;
+    while (current != NULL)
+    {
+        pidArray[count++] = current->pid;
+        current = current->next;
+    }
+
+    for (int index = 0; index < count - 1; index++)
+    {
+        for (int process = 0; process < count - index - 1; process++)
+        {
+            if (pidArray[process] > pidArray[process + 1])
+            {
+                int temp = pidArray[process];
+                pidArray[process] = pidArray[process + 1];
+                pidArray[process + 1] = temp;
+            }
+        }
+    }
+    while (!isQueueEmpty(terminatedQueue))
+    {
+        dequeue(terminatedQueue);
+    }
+
+    for (int process = 0; process < count; process++)
+    {
+        enqueue(terminatedQueue, pidArray[process]);
+    }
+
+    free(pidArray);
+}
+
 void displayDetails()
 {
+    sortTerminatedQueueByPID();
+    int hasAnyProcessKilled = 0;
+    QueueNode *temp = terminatedQueue->front;
+    while (temp != NULL)
+    {
+        ProcessControlBlock *pcb = getPCB(temp->pid);
+        if (pcb->isKilled)
+        {
+            hasAnyProcessKilled = 1;
+            break;
+        }
+        temp = temp->next;
+    }
+
     printf("\n====================================================================================================\n");
-    printf("%-5s %-20s %-15s %-15s %-15s %-15s %-15s", "PID", "Name", "CPU", "IO", "Status", "Turnaround", "Waiting");
+    if (hasAnyProcessKilled)
+    {
+        printf("%-5s %-20s %-15s %-15s %-15s %-15s %-15s", "PID", "Name", "CPU", "IO", "Status", "Turnaround", "Waiting");
+    }
+    else
+    {
+        printf("%-5s %-20s %-15s %-15s %-15s %-15s", "PID", "Name", "CPU", "IO", "Turnaround", "Waiting");
+    }
     printf("\n====================================================================================================\n");
 
     QueueNode *current = terminatedQueue->front;
     while (current != NULL)
     {
         ProcessControlBlock *pcb = getPCB(current->pid);
-        char status[20];
-        if (pcb->isKilled)
+
+        if (hasAnyProcessKilled)
         {
-            sprintf(status, "KILLED AT %d", pcb->completionTime);
-            printf("%-5d %-20s %-15d %-15d %-15s %-15s %-15s\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, "-", "-");
+            char status[20];
+            if (pcb->isKilled)
+            {
+                sprintf(status, "KILLED at %d", pcb->completionTime);
+                printf("%-5d %-20s %-15d %-15d %-15s %-15s %-15s\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, "-", "-");
+            }
+            else
+            {
+                sprintf(status, "OK");
+                printf("%-5d %-20s %-15d %-15d %-15s %-15d %-15d\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, pcb->turnAroundTime, pcb->waitingTime);
+            }
         }
         else
         {
-            sprintf(status, "OK");
-            printf("%-5d %-20s %-15d %-15d %-15s %-15d %-15d\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, pcb->turnAroundTime, pcb->waitingTime);
+            printf("%-5d %-20s %-15d %-15d %-15d %-15d\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, pcb->turnAroundTime, pcb->waitingTime);
         }
 
         current = current->next;
@@ -501,46 +576,22 @@ void displayDetails()
     printf("\n====================================================================================================\n");
 }
 
-int getValidInteger()
+void readInp()
 {
-    int num;
-    while (1)
-    {
-        if (scanf("%d", &num) != 1)
-        {
-            printf("Invalid input. Please enter again: ");
-            while (getchar() != '\n');
-        }
-        else
-        {
-            if (getchar() != '\n')
-            {
-                printf("Invalid input. Please enter again: ");
-                while (getchar() != '\n');
-            }
-            else
-            {
-                return num;
-            }
-        }
-    }
-}
-
-void readInput()
-{
-    printf("Enter number of input lines: ");
-    int number = getValidInteger();
-
     char line[MAX_LINE_LENGTH];
 
-    while (number--)
+    while (fgets(line, MAX_LINE_LENGTH, stdin) != NULL)
     {
-        fgets(line, MAX_LINE_LENGTH, stdin);
-
         int length = stringLength(line);
         if (line[length - 1] == '\n')
         {
             line[length - 1] = '\0';
+            length--;
+        }
+
+        if (length == 0)
+        {
+            break;
         }
 
         char command[MAX_COMMAND_LENGTH];
@@ -555,8 +606,22 @@ void readInput()
         else
         {
             char name[MAX_NAME_LENGTH];
-            int pid, burstTime, ioStart, ioDuration;
-            sscanf(line, "%s %d %d %d %d", name, &pid, &burstTime, &ioStart, &ioDuration);
+            int pid, burstTime;
+            char ioStartStr[10], ioDurationStr[10];
+            int ioStart = 0, ioDuration = 0;
+
+            sscanf(line, "%s %d %d %s %s", name, &pid, &burstTime, ioStartStr, ioDurationStr);
+
+            if (ioStartStr[0] != '-')
+            {
+                ioStart = atoi(ioStartStr);
+            }
+
+            if (ioDurationStr[0] != '-')
+            {
+                ioDuration = atoi(ioDurationStr);
+            }
+
             initializePCB(pid, name, burstTime, ioStart, ioDuration);
         }
     }
@@ -599,7 +664,7 @@ void freeMemory()
 
 void initiateScheduler()
 {
-    readInput();
+    readInp();
     startScheduler();
     calculateValues();
     displayDetails();
