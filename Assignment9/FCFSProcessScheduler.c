@@ -576,7 +576,7 @@ void displayDetails()
     printf("\n====================================================================================================\n");
 }
 
-void readInp()
+void readInput()
 {
     char line[MAX_LINE_LENGTH];
 
@@ -664,7 +664,7 @@ void freeMemory()
 
 void initiateScheduler()
 {
-    readInp();
+    readInput();
     startScheduler();
     calculateValues();
     displayDetails();
