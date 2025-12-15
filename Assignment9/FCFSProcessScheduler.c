@@ -189,15 +189,6 @@ int isQueueEmpty(Queue *queue)
     return queue->front == NULL;
 }
 
-int peekQueue(Queue *queue)
-{
-    if (queue->front == NULL)
-    {
-        return -1;
-    }
-    return queue->front->pid;
-}
-
 int dequeue(Queue *queue)
 {
     if (isQueueEmpty(queue))
@@ -218,34 +209,6 @@ int dequeue(Queue *queue)
     return popped;
 }
 
-void initializePCB(int pid, char *name, int burstTime, int ioStart, int ioDuration)
-{
-    ProcessControlBlock *pcb = (ProcessControlBlock *)malloc(sizeof(ProcessControlBlock));
-    pcb->pid = pid;
-    pcb->name = stringCopy(name);
-    pcb->burstTime = burstTime;
-    pcb->remainingBurstTime = burstTime;
-    pcb->ioStartTime = ioStart;
-    pcb->ioDuration = ioDuration;
-    pcb->remainingIoTime = ioDuration;
-    pcb->executionTime = 0;
-    pcb->turnAroundTime = 0;
-    pcb->waitingTime = 0;
-    pcb->completionTime = 0;
-    pcb->state = READY;
-    pcb->isKilled = 0;
-    pcb->ioJustStarted = 0;
-
-    int index = hashFunction(pid);
-    while (pcbHashMap[index].status == OCCUPIED)
-    {
-        index = (index + 1) % MAX_PROCESSES;
-    }
-    pcbHashMap[index].pcb = pcb;
-    pcbHashMap[index].status = OCCUPIED;
-    enqueue(readyQueue, pid);
-}
-
 ProcessControlBlock *getPCB(int pid)
 {
     int index = hashFunction(pid);
@@ -264,6 +227,66 @@ ProcessControlBlock *getPCB(int pid)
         }
     }
     return NULL;
+}
+
+int isDuplicatePID(int pid)
+{
+    return getPCB(pid) != NULL;
+}
+
+void registerPCB(ProcessControlBlock *pcb)
+{
+    int index = hashFunction(pcb->pid);
+
+    while (pcbHashMap[index].status == OCCUPIED)
+    {
+        index = (index + 1) % MAX_PROCESSES;
+    }
+    pcbHashMap[index].pcb = pcb;
+    pcbHashMap[index].status = OCCUPIED;
+}
+
+ProcessControlBlock *initializePCB(int pid, char *name, int burstTime, int ioStart, int ioDuration)
+{
+    ProcessControlBlock *pcb = (ProcessControlBlock *)malloc(sizeof(ProcessControlBlock));
+    if (!pcb)
+    {
+        printf("Memory Allocation failed.\n");
+        return NULL;
+    }
+    pcb->pid = pid;
+    pcb->name = stringCopy(name);
+    pcb->burstTime = burstTime;
+    pcb->remainingBurstTime = burstTime;
+    pcb->ioStartTime = ioStart;
+    pcb->ioDuration = ioDuration;
+    pcb->remainingIoTime = ioDuration;
+    pcb->executionTime = 0;
+    pcb->turnAroundTime = 0;
+    pcb->waitingTime = 0;
+    pcb->completionTime = 0;
+    pcb->state = READY;
+    pcb->isKilled = 0;
+    pcb->ioJustStarted = 0;
+
+    return pcb;
+}
+
+void addProcess(int pid, char *name, int burstTime, int ioStart, int ioDuration)
+{
+    if (isDuplicatePID(pid))
+    {
+        printf("Duplicate PID %d found.\n", pid);
+        return;
+    }
+
+    ProcessControlBlock *pcb = initializePCB(pid, name, burstTime, ioStart, ioDuration);
+    if (!pcb)
+    {
+        return;
+    }
+    registerPCB(pcb);
+    enqueue(readyQueue, pid);
 }
 
 EventToKill *createEvent(int pid, int killTime)
@@ -323,6 +346,34 @@ void processKillEvents()
     }
 }
 
+int updateIO(ProcessControlBlock *pcb)
+{
+    if (pcb->ioJustStarted)
+    {
+        pcb->ioJustStarted = 0;
+        return 0;
+    }
+
+    if (pcb->remainingIoTime > 0)
+    {
+        pcb->remainingIoTime--;
+        if (pcb->remainingIoTime == 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void handleIOCompletion(ProcessControlBlock *pcb)
+{
+    if (!pcb->isKilled)
+    {
+        pcb->state = READY;
+        enqueue(readyQueue, pcb->pid);
+    }
+}
+
 void updateWaitingProcesses()
 {
     if (isQueueEmpty(waitingQueue))
@@ -336,49 +387,33 @@ void updateWaitingProcesses()
     {
         ProcessControlBlock *pcb = getPCB(current->pid);
         QueueNode *nextNode = current->next;
-        if (pcb != NULL)
+
+        if (pcb && updateIO(pcb))
         {
-            if (pcb->ioJustStarted)
+            handleIOCompletion(pcb);
+            if (prev == NULL)
             {
-                pcb->ioJustStarted = 0;
+                waitingQueue->front = nextNode;
+                if (waitingQueue->front == NULL)
+                {
+                    waitingQueue->rear = NULL;
+                }
             }
             else
             {
-                if (pcb->remainingIoTime > 0)
+                prev->next = nextNode;
+                if (nextNode == NULL)
                 {
-                    pcb->remainingIoTime--;
-                    if (pcb->remainingIoTime == 0)
-                    {
-                        if (!pcb->isKilled)
-                        {
-                            pcb->state = READY;
-                            enqueue(readyQueue, pcb->pid);
-                        }
-                        if (prev == NULL)
-                        {
-                            waitingQueue->front = current->next;
-                            if (waitingQueue->front == NULL)
-                            {
-                                waitingQueue->rear = NULL;
-                            }
-                        }
-                        else
-                        {
-                            prev->next = current->next;
-                            if (current->next == NULL)
-                            {
-                                waitingQueue->rear = prev;
-                            }
-                        }
-                        free(current);
-                        (waitingQueue->size)--;
-                        current = nextNode;
-                        continue;
-                    }
+                    waitingQueue->rear = prev;
                 }
             }
+            free(current);
+            (waitingQueue->size)--;
         }
-        prev = current;
+        else
+        {
+            prev = current;
+        }
         current = nextNode;
     }
 }
@@ -480,7 +515,7 @@ void sortTerminatedQueueByPID()
         return;
     }
 
-    int *pidArray = (int*) malloc(terminatedQueue->size * sizeof(int));
+    int *pidArray = (int *)malloc(terminatedQueue->size * sizeof(int));
     if (!pidArray)
     {
         printf("Memory allocation failed.\n");
@@ -516,28 +551,44 @@ void sortTerminatedQueueByPID()
     {
         enqueue(terminatedQueue, pidArray[process]);
     }
-
     free(pidArray);
+}
+
+void getProcessStatus(ProcessControlBlock *pcb, char *status)
+{
+    if (pcb->isKilled)
+    {
+        sprintf(status, "KILLED at %d", pcb->completionTime);
+    }
+    else
+    {
+        sprintf(status, "OK");
+    }
+}
+
+int hasAnyProcessKilled()
+{
+    QueueNode *current = terminatedQueue->front;
+
+    while (current != NULL)
+    {
+        ProcessControlBlock *pcb = getPCB(current->pid);
+        if (pcb->isKilled)
+        {
+            return 1;
+        }
+        current = current->next;
+    }
+    return 0;
 }
 
 void displayDetails()
 {
     sortTerminatedQueueByPID();
-    int hasAnyProcessKilled = 0;
-    QueueNode *temp = terminatedQueue->front;
-    while (temp != NULL)
-    {
-        ProcessControlBlock *pcb = getPCB(temp->pid);
-        if (pcb->isKilled)
-        {
-            hasAnyProcessKilled = 1;
-            break;
-        }
-        temp = temp->next;
-    }
+    int showStatus = hasAnyProcessKilled();
 
     printf("\n====================================================================================================\n");
-    if (hasAnyProcessKilled)
+    if (showStatus)
     {
         printf("%-5s %-20s %-15s %-15s %-15s %-15s %-15s", "PID", "Name", "CPU", "IO", "Status", "Turnaround", "Waiting");
     }
@@ -552,17 +603,16 @@ void displayDetails()
     {
         ProcessControlBlock *pcb = getPCB(current->pid);
 
-        if (hasAnyProcessKilled)
+        if (showStatus)
         {
             char status[20];
+            getProcessStatus(pcb, status);
             if (pcb->isKilled)
             {
-                sprintf(status, "KILLED at %d", pcb->completionTime);
                 printf("%-5d %-20s %-15d %-15d %-15s %-15s %-15s\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, "-", "-");
             }
             else
             {
-                sprintf(status, "OK");
                 printf("%-5d %-20s %-15d %-15d %-15s %-15d %-15d\n", pcb->pid, pcb->name, pcb->burstTime, pcb->ioDuration, status, pcb->turnAroundTime, pcb->waitingTime);
             }
         }
@@ -622,7 +672,7 @@ void readInput()
                 ioDuration = atoi(ioDurationStr);
             }
 
-            initializePCB(pid, name, burstTime, ioStart, ioDuration);
+            addProcess(pid, name, burstTime, ioStart, ioDuration);
         }
     }
 }
